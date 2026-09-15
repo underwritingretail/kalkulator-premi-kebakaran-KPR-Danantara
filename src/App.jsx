@@ -9,7 +9,6 @@ import {
   ChevronDown,
   Flame,
   Info,
-  LandPlot,
   Landmark,
   MapPin,
   Printer,
@@ -49,15 +48,21 @@ const OCCUPANCIES = {
     residential: true,
   },
   apartemen_6_18: {
-    label: "Apartemen 6 lantai sampai dengan 18 lantai",
+    label: "Apartemen lebih dari 6 lantai sampai dengan 18 lantai",
     annualRatePermille: 0.385,
     ojkRates: { 2: { lower: 0.52, upper: 0.65 }, 3: { lower: 0.655, upper: 0.818 } },
     residential: true,
   },
   apartemen_18: {
-    label: "Apartemen lebih dari 18 lantai",
+    label: "Apartemen lebih dari 18 lantai sampai dengan 24 lantai",
     annualRatePermille: 0.376,
     ojkRates: { 2: { lower: 0.507, upper: 0.567 }, 3: { lower: 0.639, upper: 0.714 } },
+    residential: true,
+  },
+  apartemen_24_plus: {
+    label: "Apartemen lebih dari 24 lantai",
+    annualRatePermille: 0.455,
+    ojkRates: { 2: { lower: 0.614, upper: 0.768 }, 3: { lower: 0.774, upper: 0.967 } },
     residential: true,
   },
   ruko: {
@@ -74,11 +79,19 @@ const OCCUPANCIES = {
   },
 };
 
+function EarthquakeHouseIcon({ size = 24, ...props }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m3 11 9-7 9 7v9H3z" />
+      <path d="m13 8-3 5 3 1-2 5 4-6-3-1z" />
+    </svg>
+  );
+}
+
 const EXTENSION_OPTIONS = [
   { key: "banjir", label: "Banjir", Icon: Waves },
-  { key: "gempa", label: "Gempa", Icon: LandPlot },
-  { key: "rsmd", label: "Kerusuhan", Icon: UsersRound },
-  { key: "rsmdcc", label: "Kerusuhan dan Huru-Hara", Icon: Flame },
+  { key: "gempa", label: "Gempa", Icon: EarthquakeHouseIcon },
+  { key: "rsmdcc", label: "Kerusuhan dan Huru-Hara", Icon: UsersRound },
 ];
 
 const EXTENSION_ICON_BY_LABEL = Object.fromEntries(EXTENSION_OPTIONS.map(({ label, Icon }) => [label, Icon]));
@@ -152,6 +165,15 @@ function formatRupiah(value) {
   }).format(Math.round(Number(value) || 0));
 }
 
+function formatPremiumRupiah(value) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value) || 0);
+}
+
 function formatNumber(value, maximumFractionDigits = 3) {
   return new Intl.NumberFormat("id-ID", { maximumFractionDigits }).format(Number(value) || 0);
 }
@@ -208,7 +230,6 @@ function extensionRateFor({ occupancyKey, extensions, floodLocation, earthquakeF
       if (rate) rows.push({ label: "Gempa", rate, source: `Tarif gempa OJK Zona ${earthquakeLocation.zone}, ${floorDescription} (${earthquakeLocation.locationLabel})` });
     }
   }
-  if (extensions.includes("rsmd")) rows.push({ label: "Kerusuhan", rate: 0.001, source: "Kerusuhan 0,001‰ per tahun" });
   if (extensions.includes("rsmdcc")) rows.push({ label: "Kerusuhan dan Huru-Hara", rate: 0.001, source: "Kerusuhan dan Huru-Hara 0,001‰ per tahun" });
 
   return { rows, errors, rate: rows.reduce((total, item) => total + item.rate, 0) };
@@ -324,7 +345,6 @@ export function App() {
   const maxEndDate = addDays(form.startDate, MAX_POLICY_DAYS);
   const hasFlood = form.extensions.includes("banjir");
   const hasEarthquake = form.extensions.includes("gempa");
-  const hasRsmd = form.extensions.includes("rsmd");
   const hasRsmdcc = form.extensions.includes("rsmdcc");
   const isDwelling = Boolean(occupancy?.residential);
   const isEarthquakeDwelling2976 = isEarthquakeDwelling(form.occupancy);
@@ -505,12 +525,12 @@ export function App() {
     };
 
     const premiumRows = [
-      ["Jaminan Kebakaran", `${formatNumber(baseRate.rate)} per mil per tahun`, formatRupiah(baseCoveragePremium), "normal"],
-      ...quotationExtensions.map(({ label, rate, premium }) => [`Perluasan ${label}`, `${formatNumber(rate)} per mil per tahun`, formatRupiah(premium), "normal"]),
-      [`Premi untuk ${term.label}`, "", formatRupiah(sideResult.premium), "subtotal"],
-      ["Biaya Polis", "", formatRupiah(POLICY_FEE), "normal"],
-      ["Biaya Materai", "", formatRupiah(STAMP_DUTY), "normal"],
-      ["TOTAL PREMI", "", formatRupiah(sideResult.totalPayable), "total"],
+      ["Jaminan Kebakaran", `${formatNumber(baseRate.rate)} per mil per tahun`, formatPremiumRupiah(baseCoveragePremium), "normal"],
+      ...quotationExtensions.map(({ label, rate, premium }) => [`Perluasan ${label}`, `${formatNumber(rate)} per mil per tahun`, formatPremiumRupiah(premium), "normal"]),
+      [`Premi untuk ${term.label}`, "", formatPremiumRupiah(sideResult.premium), "subtotal"],
+      ["Biaya Polis", "", formatPremiumRupiah(POLICY_FEE), "normal"],
+      ["Biaya Materai", "", formatPremiumRupiah(STAMP_DUTY), "normal"],
+      ["TOTAL PREMI", "", formatPremiumRupiah(sideResult.totalPayable), "total"],
     ];
 
     const drawPremiumTable = (startY) => {
@@ -636,7 +656,6 @@ export function App() {
       "Klausul Pemberitahuan Kerugian (30 hari).",
       "Klausul Definisi Surat Permohonan Asuransi Umum (SPAU).",
       ...(hasFlood ? ["Endorsemen Banjir, Angin Topan, Badai Dan Kerusakan Akibat Air (Kode: 4.3 A)."] : []),
-      ...(hasRsmd ? ["Endorsemen Kerusuhan, Pemogokan, Dan Perbuatan Jahat (Kode: 4.1A / 2007)."] : []),
       ...(hasRsmdcc ? ["Endorsemen Kerusuhan, Pemogokan, Perbuatan Jahat, Dan Huru-Hara (Kode: 4.1B / 2007)."] : []),
     ]);
 
@@ -654,7 +673,7 @@ export function App() {
       `Kebakaran: ${isDwelling ? "Nil." : "5% dari nilai kerugian yang disetujui atau 0,1% dari total nilai pertanggungan untuk setiap risiko dan setiap lokasi, mana yang lebih besar."}`,
       ...(hasFlood ? ["Banjir: 10% dari jumlah ganti rugi yang disetujui."] : []),
       ...(hasEarthquake ? ["Gempa: 2,5% dari Harga Pertanggungan Keseluruhan."] : []),
-      ...(hasRsmd || hasRsmdcc ? ["Kerusuhan / Kerusuhan dan Huru-Hara: 5% dari jumlah ganti rugi yang disetujui, minimum Rp5.000.000 setiap kejadian."] : []),
+      ...(hasRsmdcc ? ["Kerusuhan dan Huru-Hara: 5% dari jumlah ganti rugi yang disetujui, minimum Rp5.000.000 setiap kejadian."] : []),
     ]);
 
     const disclaimerLines = pdf.splitTextToSize(clean(UNDERWRITING_DISCLAIMER), contentWidth);
@@ -836,10 +855,10 @@ export function App() {
                 <SummaryLine label="Total Harga Pertanggungan" value={formatRupiah(tsi)} />
                 <SummaryLine label="Tarif dasar" value={`${formatNumber(baseRate.rate)}‰`} />
                 <SummaryLine label="Tarif perluasan" value={`${formatNumber(extensionRate.rate)}‰`} />
-                <SummaryLine label="Premi tahunan" value={formatRupiah(sideResult.annualPremium)} />
-                <SummaryLine label="Biaya polis" value={formatRupiah(POLICY_FEE)} />
-                <SummaryLine label="Biaya materai" value={formatRupiah(STAMP_DUTY)} />
-                <SummaryLine total label="Total premi" value={formatRupiah(sideResult.totalPayable)} />
+                <SummaryLine label="Premi tahunan" value={formatPremiumRupiah(sideResult.annualPremium)} />
+                <SummaryLine label="Biaya polis" value={formatPremiumRupiah(POLICY_FEE)} />
+                <SummaryLine label="Biaya materai" value={formatPremiumRupiah(STAMP_DUTY)} />
+                <SummaryLine total label="Total premi" value={formatPremiumRupiah(sideResult.totalPayable)} />
               </> : <div className="result-card__empty"><Calculator size={30} aria-hidden="true" /><span>Masukkan data objek pertanggungan dan tekan <b>Hitung Premi</b>.</span></div>}
               <div className="quotation-actions">
                 <button className="print-button" type="button" disabled={!sideResult || isPreparingPdf} onClick={saveQuotationPdf}><Printer size={16} aria-hidden="true" />{isPreparingPdf ? "Menyiapkan PDF..." : "Simpan PDF Penawaran"}</button>
@@ -883,12 +902,12 @@ export function App() {
                 <table className="quotation-letter__premium-table">
                   <thead><tr><th>Jaminan</th><th>Tarif</th><th>Premi</th></tr></thead>
                   <tbody>
-                    <tr><td>Jaminan Kebakaran</td><td>{formatNumber(baseRate.rate)}‰ per tahun</td><td>{formatRupiah(baseCoveragePremium)}</td></tr>
-                    {quotationExtensions.map(({ label, rate, premium }) => <tr key={label}><td>Perluasan {label}</td><td>{formatNumber(rate)}‰ per tahun</td><td>{formatRupiah(premium)}</td></tr>)}
-                    <tr className="quotation-letter__subtotal"><td colSpan="2">Premi untuk {term.label}</td><td>{formatRupiah(sideResult.premium)}</td></tr>
-                    <tr><td colSpan="2">Biaya Polis</td><td>{formatRupiah(POLICY_FEE)}</td></tr>
-                    <tr><td colSpan="2">Biaya Materai</td><td>{formatRupiah(STAMP_DUTY)}</td></tr>
-                    <tr className="quotation-letter__total"><td colSpan="2">TOTAL PREMI</td><td>{formatRupiah(sideResult.totalPayable)}</td></tr>
+                    <tr><td>Jaminan Kebakaran</td><td>{formatNumber(baseRate.rate)}‰ per tahun</td><td>{formatPremiumRupiah(baseCoveragePremium)}</td></tr>
+                    {quotationExtensions.map(({ label, rate, premium }) => <tr key={label}><td>Perluasan {label}</td><td>{formatNumber(rate)}‰ per tahun</td><td>{formatPremiumRupiah(premium)}</td></tr>)}
+                    <tr className="quotation-letter__subtotal"><td colSpan="2">Premi untuk {term.label}</td><td>{formatPremiumRupiah(sideResult.premium)}</td></tr>
+                    <tr><td colSpan="2">Biaya Polis</td><td>{formatPremiumRupiah(POLICY_FEE)}</td></tr>
+                    <tr><td colSpan="2">Biaya Materai</td><td>{formatPremiumRupiah(STAMP_DUTY)}</td></tr>
+                    <tr className="quotation-letter__total"><td colSpan="2">TOTAL PREMI</td><td>{formatPremiumRupiah(sideResult.totalPayable)}</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -909,7 +928,6 @@ export function App() {
                 <li>Klausul Pemberitahuan Kerugian (30 hari).</li>
                 <li>Klausul Definisi Surat Permohonan Asuransi Umum (SPAU).</li>
                 {hasFlood ? <li>Endorsemen Banjir, Angin Topan, Badai Dan Kerusakan Akibat Air (Kode: 4.3 A).</li> : null}
-                {hasRsmd ? <li>Endorsemen Kerusuhan, Pemogokan, Dan Perbuatan Jahat (Kode: 4.1A / 2007).</li> : null}
                 {hasRsmdcc ? <li>Endorsemen Kerusuhan, Pemogokan, Perbuatan Jahat, Dan Huru-Hara (Kode: 4.1B / 2007).</li> : null}
               </ul>
 
@@ -927,7 +945,7 @@ export function App() {
                 <li>Kebakaran: {isDwelling ? "Nil." : "5% dari nilai kerugian yang disetujui atau 0,1% dari total nilai pertanggungan untuk setiap risiko dan setiap lokasi, mana yang lebih besar."}</li>
                 {hasFlood ? <li>Banjir: 10% dari jumlah ganti rugi yang disetujui.</li> : null}
                 {hasEarthquake ? <li>Gempa: 2,5% dari Harga Pertanggungan Keseluruhan.</li> : null}
-                {hasRsmd || hasRsmdcc ? <li>Kerusuhan / Kerusuhan dan Huru-Hara: 5% dari jumlah ganti rugi yang disetujui, minimum Rp5.000.000 setiap kejadian.</li> : null}
+                {hasRsmdcc ? <li>Kerusuhan dan Huru-Hara: 5% dari jumlah ganti rugi yang disetujui, minimum Rp5.000.000 setiap kejadian.</li> : null}
               </ul>
               </section>
 
