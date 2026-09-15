@@ -7,6 +7,7 @@ test("only Rumah Tinggal occupation code 2976 is treated as dwelling", () => {
   assert.equal(isEarthquakeDwelling("apartemen_6"), false);
   assert.equal(isEarthquakeDwelling("apartemen_6_18"), false);
   assert.equal(isEarthquakeDwelling("apartemen_18"), false);
+  assert.equal(isEarthquakeDwelling("apartemen_24_plus"), false);
   assert.equal(isEarthquakeDwelling("ruko"), false);
   assert.equal(isEarthquakeDwelling("rukan"), false);
 });
